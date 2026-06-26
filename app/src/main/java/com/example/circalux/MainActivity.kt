@@ -283,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     "history" -> HistoryScreen(viewModel)
                                     "profile" -> ProfileScreen(viewModel)
-                                    "settings" -> SettingsScreen(viewModel)
+                                    "settings" -> SettingsScreen(viewModel, onNavigateToPrivacy = { currentScreen = "privacy" })
                                     "manifesto" -> ManifestoScreen()
                                     "sensors" -> SensorStatusScreen(viewModel)
                                     "about" -> AboutScreen()
@@ -292,8 +292,11 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (!viewModel.hasAcceptedConsent) {
-                                ConsentDialog(onAccept = { viewModel.acceptConsent() })
-                            }
+                            ConsentDialog(
+                                onAccept = { viewModel.acceptConsent() },
+                                onViewFullPolicy = { currentScreen = "privacy" }
+                            )
+                        }
 
                             val profileState by viewModel.profile.collectAsState()
                             val skinTypeForLegend = profileState?.skinType ?: viewModel.skinType

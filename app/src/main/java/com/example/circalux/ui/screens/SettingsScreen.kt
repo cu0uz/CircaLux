@@ -22,7 +22,7 @@ import com.example.circalux.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel) {
+fun SettingsScreen(viewModel: MainViewModel, onNavigateToPrivacy: () -> Unit) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -119,7 +119,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         title = "Privacidad y RGPD",
                         subtitle = "Consulta nuestra política de datos",
                         icon = Icons.Default.Lock,
-                        onClick = { /* Could open PrivacyPolicyScreen */ }
+                        onClick = onNavigateToPrivacy
                     )
 
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.circalux.ui.theme.RedLightSession
@@ -36,7 +37,7 @@ fun SolarSessionControls(
         border = androidx.compose.foundation.BorderStroke(1.dp, SolarYellow.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -46,35 +47,54 @@ fun SolarSessionControls(
             ) {
                 Text(
                     "SESIÓN DE SOL", 
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
                     color = SolarYellow,
                     letterSpacing = 1.sp
                 )
-                Text(
-                    "${String.format("%.0f", vitaminDPerMin)} UI/min",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
+                
+                Surface(
+                    color = SolarYellow.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "${String.format("%.0f", vitaminDPerMin)} IU/min",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SolarYellow,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             
+            Text(
+                "SELECCIONA TU NIVEL DE EXPOSICIÓN",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // CLEARER EXPOSURE SELECTOR
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 val percentages = listOf(
-                    0.1 to "Cara/Manos",
+                    0.1 to "Solo cara",
                     0.3 to "Camiseta",
                     0.5 to "Pantalón",
                     0.7 to "Bañador",
-                    1.0 to "Total"
+                    1.0 to "Desnudo"
                 )
                 percentages.forEach { (pct, label) ->
-                    ExposureChip(
+                    ExposureCard(
                         pct = pct,
-                        desc = label,
+                        label = label,
                         isSelected = exposure == pct,
                         onClick = { onExposureChange(pct) },
                         modifier = Modifier.weight(1f)
@@ -82,21 +102,24 @@ fun SolarSessionControls(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = if (isActive) onStop else onStart,
-                modifier = Modifier.fillMaxWidth().height(64.dp),
+                modifier = Modifier.fillMaxWidth().height(60.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isActive) Color(0xFFE53935) else SolarYellow,
                     contentColor = if (isActive) Color.White else Color.Black
-                )
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
+                Icon(if (isActive) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    if (isActive) "FINALIZAR" else "INICIAR",
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.titleLarge
+                    if (isActive) "FINALIZAR SESIÓN" else "INICIAR EXPOSICIÓN",
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
         }
@@ -104,45 +127,42 @@ fun SolarSessionControls(
 }
 
 @Composable
-fun ExposureChip(
+fun ExposureCard(
     pct: Double,
-    desc: String,
+    label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .padding(horizontal = 2.dp)
-            .clickable { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(75.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) SolarYellow else Color(0xFF232B39),
+        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .background(
-                    color = if (isSelected) SolarYellow else Color(0xFF232B39),
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.padding(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = "${(pct * 100).toInt()}%",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                color = if (isSelected) Color.Black else Color.White
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 8.sp,
+                lineHeight = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.6f)
+                textAlign = TextAlign.Center,
+                color = if (isSelected) Color.Black.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.5f)
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = desc,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isSelected) SolarYellow else Color.White.copy(alpha = 0.4f),
-            maxLines = 1
-        )
     }
 }
 
@@ -165,71 +185,68 @@ fun RedLightSessionCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, RedLightSession.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Text(
                 "SESIÓN LUZ ROJA", 
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
                 color = RedLightSession,
                 letterSpacing = 1.sp
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             if (!isActive) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Potencia (W)", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Slider(
-                                value = powerWatts.toFloat(),
-                                onValueChange = { onPowerChange(it.toInt()) },
-                                valueRange = 10f..300f,
-                                modifier = Modifier.weight(1f),
-                                colors = SliderDefaults.colors(thumbColor = RedLightSession, activeTrackColor = RedLightSession)
-                            )
-                            Text("$powerWatts", modifier = Modifier.width(35.dp), style = MaterialTheme.typography.bodySmall)
-                        }
+                        Text("POTENCIA: ${powerWatts}W", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                        Slider(
+                            value = powerWatts.toFloat(),
+                            onValueChange = { onPowerChange(it.toInt()) },
+                            valueRange = 10f..300f,
+                            colors = SliderDefaults.colors(thumbColor = RedLightSession, activeTrackColor = RedLightSession)
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Distancia (cm)", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Slider(
-                                value = distanceCm.toFloat(),
-                                onValueChange = { onDistanceChange(it.toInt()) },
-                                valueRange = 5f..100f,
-                                modifier = Modifier.weight(1f),
-                                colors = SliderDefaults.colors(thumbColor = RedLightSession, activeTrackColor = RedLightSession)
-                            )
-                            Text("$distanceCm", modifier = Modifier.width(35.dp), style = MaterialTheme.typography.bodySmall)
-                        }
+                        Text("DISTANCIA: ${distanceCm}cm", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                        Slider(
+                            value = distanceCm.toFloat(),
+                            onValueChange = { onDistanceChange(it.toInt()) },
+                            valueRange = 5f..100f,
+                            colors = SliderDefaults.colors(thumbColor = RedLightSession, activeTrackColor = RedLightSession)
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                    Text("P: ${powerWatts}W", color = Color.White.copy(alpha = 0.7f))
-                    Text("D: ${distanceCm}cm", color = Color.White.copy(alpha = 0.7f))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Surface(color = RedLightSession.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("POTENCIA: ${powerWatts}W", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium, color = RedLightSession, fontWeight = FontWeight.Bold)
+                    }
+                    Surface(color = RedLightSession.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("DISTANCIA: ${distanceCm}cm", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium, color = RedLightSession, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             }
+            
+            Spacer(modifier = Modifier.height(20.dp))
 
-            OutlinedButton(
+            Button(
                 onClick = if (isActive) onStop else onStart,
-                modifier = Modifier.fillMaxWidth().height(64.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(2.dp, RedLightSession.copy(alpha = 0.5f)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = RedLightSession
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isActive) Color(0xFFE53935) else RedLightSession.copy(alpha = 0.8f),
+                    contentColor = Color.White
                 )
             ) {
+                Icon(if (isActive) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    if (isActive) "PARAR RLT" else "INICIAR RLT",
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.titleLarge
+                    if (isActive) "PARAR LUZ ROJA" else "INICIAR LUZ ROJA",
+                    fontWeight = FontWeight.Black
                 )
             }
         }

@@ -15,7 +15,8 @@ import androidx.compose.ui.window.DialogProperties
 
 @Composable
 fun ConsentDialog(
-    onAccept: () -> Unit
+    onAccept: () -> Unit,
+    onViewFullPolicy: () -> Unit
 ) {
     Dialog(
         onDismissRequest = { /* Force explicit choice */ },
@@ -74,7 +75,7 @@ fun ConsentDialog(
                     Text("ACEPTO Y CONTINUO", fontWeight = FontWeight.Bold)
                 }
                 
-                TextButton(onClick = { /* Could open the full policy screen */ }) {
+                TextButton(onClick = onViewFullPolicy) {
                     Text("Ver Política completa")
                 }
             }
