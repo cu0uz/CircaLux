@@ -1,5 +1,5 @@
 Categories:
-  - Health
+  - Sports & Health
 License: GPL-3.0-or-later
 WebSite: https://ko-fi.com/cu0uz
 SourceCode: https://github.com/cu0uz/CircaLux
@@ -7,24 +7,27 @@ RepoType: git
 Repo: https://github.com/cu0uz/CircaLux
 IssueTracker: https://github.com/cu0uz/CircaLux/issues
 
-Summary: Herramienta de optimización del ritmo circadiano y Vitamina D.
+Summary: Optimización del ritmo circadiano y Vitamina D.
 Description: |
-  CircaLux es una aplicación Android nativa diseñada para ayudar a los usuarios a optimizar su ritmo circadiano 
-  y monitorizar la síntesis de Vitamina D mediante sesiones de exposición solar y Terapia de Luz Roja (RLT).
+  CircaLux es una aplicación Android nativa diseñada para ayudar a los usuarios a optimizar su ritmo circadiano y monitorizar la síntesis de Vitamina D mediante sesiones de exposición solar y Terapia de Luz Roja (RLT).
   
   Características principales:
-  - Monitorización en tiempo real de UVI, Lux y elevación solar mediante algoritmos astronómicos.
-  - Base de conocimiento científico integrada con referencias bibliográficas sobre fotobiología.
-  - Brújula solar para optimizar la exposición corporal según el acimut.
-  - Registro de salud metabólica (Glucosa, Cetonas, GKI) y composición corporal.
-  - Privacidad garantizada: Sin Google Play Services, sin rastreadores y almacenamiento 100% local.
-  - Modelo de activación mediante donación única para eliminar límites de sesión.
+  * Monitorización en tiempo real de UVI, Lux y elevación solar mediante algoritmos astronómicos.
+  * Base de conocimiento científico integrada con referencias bibliográficas sobre fotobiología.
+  * Brújula solar para optimizar la exposición corporal según el acimut.
+  * Registro de salud metabólica (Glucosa, Cetonas, GKI) y composición corporal.
+  * Privacidad garantizada: Sin Google Play Services, sin rastreadores y almacenamiento 100% local.
+  * Modelo de activación mediante donación única para eliminar límites de sesión.
 
 Builds:
   - versionName: 1.0.0
     versionCode: 1
     commit: v1.0.0
-    subdir: app
+    subdir: android
+    prebuild:
+      - cd ..
+      - npm install
+      - npx cap sync android
     gradle:
       - yes
 
