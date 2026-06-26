@@ -112,6 +112,50 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             context.startActivity(intent)
                         }
                     )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+
+                    SettingItem(
+                        title = "Privacidad y RGPD",
+                        subtitle = "Consulta nuestra política de datos",
+                        icon = Icons.Default.Lock,
+                        onClick = { /* Could open PrivacyPolicyScreen */ }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+
+                    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+                    SettingItem(
+                        title = "Borrar Todos los Datos",
+                        subtitle = "Eliminar historial y perfil permanentemente",
+                        icon = Icons.Default.DeleteForever,
+                        onClick = { showDeleteConfirm = true }
+                    )
+
+                    if (showDeleteConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteConfirm = false },
+                            title = { Text("¿Estás seguro?") },
+                            text = { Text("Esta acción es irreversible. Se borrarán todas tus sesiones, medidas corporales y configuración de perfil para cumplir con tu derecho de supresión (ARSULIPO).") },
+                            confirmButton = {
+                                Button(
+                                    onClick = { 
+                                        viewModel.deleteAllData()
+                                        showDeleteConfirm = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text("BORRAR TODO")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteConfirm = false }) {
+                                    Text("CANCELAR")
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }

@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     ) {
-                        Scaffold(
+                            Scaffold(
                             modifier = Modifier.fillMaxSize().imePadding(),
                             containerColor = Color(0xFF050B14),
                             contentWindowInsets = WindowInsets.systemBars,
@@ -272,7 +272,12 @@ class MainActivity : ComponentActivity() {
                                     "manifesto" -> ManifestoScreen()
                                     "sensors" -> SensorStatusScreen(viewModel)
                                     "about" -> AboutScreen()
+                                    "privacy" -> PrivacyPolicyScreen()
                                 }
+                            }
+
+                            if (!viewModel.hasAcceptedConsent) {
+                                ConsentDialog(onAccept = { viewModel.acceptConsent() })
                             }
 
                             val profileState by viewModel.profile.collectAsState()
@@ -359,39 +364,13 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (viewModel.showTrialInfoDialog) {
-                                AlertDialog(
-                                    onDismissRequest = { viewModel.showTrialInfoDialog = false },
-                                    title = { Text("🎁 Bienvenido a CircaLux", fontWeight = FontWeight.Bold) },
-                                    text = {
-                                        Column {
-                                            Text("Puedes usar casi todas las funciones de la app de forma totalmente gratuita (Historial, Gráficas, Perfil, Mediciones, etc.).")
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text(
-                                                "Las sesiones de Sol y Luz Roja están limitadas a 10 usos en la versión gratuita.",
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = SolarYellow
-                                            )
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text("Puedes activar la versión completa en cualquier momento desde tu Perfil.")
-                                        }
-                                    },
-                                    confirmButton = {
-                                        Button(onClick = { viewModel.showTrialInfoDialog = false }) {
-                                            Text("¡ENTENDIDO!")
-                                        }
-                                    }
-                                )
+                                // Trial info hidden for now
+                                viewModel.showTrialInfoDialog = false
                             }
                             
-                            if (viewModel.showTrialExpiredDialog || (!viewModel.isActivated && viewModel.solarSessions.collectAsState().value.size >= 10)) {
-                                ActivationModal(
-                                    userId = viewModel.userId,
-                                    onActivate = { code: String ->
-                                        if (viewModel.activateApp(code)) {
-                                            viewModel.showTrialExpiredDialog = false
-                                        }
-                                    }
-                                )
+                            if (viewModel.showTrialExpiredDialog) {
+                                // Trial expired modal hidden for now
+                                viewModel.showTrialExpiredDialog = false
                             }
 
                             activeTipKey?.let { key ->

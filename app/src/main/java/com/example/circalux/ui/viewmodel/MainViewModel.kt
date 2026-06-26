@@ -79,6 +79,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     var showOnboarding by mutableStateOf(true)
         private set
+    
+    var hasAcceptedConsent by mutableStateOf(false)
+        private set
 
     var skinType by mutableStateOf(1) // Default to I
     var skinExposurePercentage by mutableStateOf(0.1) // Default 10%
@@ -105,6 +108,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = application.getSharedPreferences("activation_prefs", Context.MODE_PRIVATE)
         isActivated = prefs.getBoolean("is_activated", false)
         showOnboarding = !prefs.getBoolean("onboarding_completed", false)
+        hasAcceptedConsent = prefs.getBoolean("consent_accepted", false)
         userId = ActivationManager.getOrCreateUserId(application)
         
         // Initial fetch
@@ -154,6 +158,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showOnboarding = false
         if (!isActivated) {
             showTrialInfoDialog = true
+        }
+    }
+
+    fun acceptConsent() {
+        hasAcceptedConsent = true
+        getApplication<Application>().getSharedPreferences("activation_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("consent_accepted", true).apply()
+    }
+
+    fun deleteAllData() {
+        viewModelScope.launch {
+            db.clearAllTables()
+            getApplication<Application>().getSharedPreferences("activation_prefs", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            getApplication<Application>().getSharedPreferences("circa_prefs", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            hasAcceptedConsent = false
+            showOnboarding = true
         }
     }
 
@@ -340,10 +362,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startSolarSession() {
+        // Trial limitation removed for now
+        /*
         if (!isActivated && solarSessions.value.size >= 10) {
             showTrialExpiredDialog = true
             return
         }
+        */
         
         if (isRedLightSessionActive) stopRedLightSession()
         isSolarSessionActive = true
@@ -400,11 +425,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 sessionDao.insertSolarSession(session)
                 
+                // Trial status logic hidden for now
+                /*
                 if (!isActivated) {
                     val count = solarSessions.value.size + 1
                     sessionsRemaining = (10 - count).coerceAtLeast(0)
                     showTrialStatusDialog = true
                 }
+                */
             }
         }
         isSolarSessionActive = false

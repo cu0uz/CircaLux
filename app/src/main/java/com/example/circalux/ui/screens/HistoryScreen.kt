@@ -53,10 +53,12 @@ fun HistoryScreen(viewModel: MainViewModel) {
                 containerColor = Color(0xFF050B14),
                 contentColor = SolarYellow,
                 indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = SolarYellow
-                    )
+                    if (selectedTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = SolarYellow
+                        )
+                    }
                 }
             ) {
                 tabs.forEachIndexed { index, title ->
