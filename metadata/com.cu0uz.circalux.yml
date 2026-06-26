@@ -4,10 +4,11 @@ License: GPL-3.0-or-later
 WebSite: https://ko-fi.com/cu0uz
 SourceCode: https://github.com/cu0uz/CircaLux
 IssueTracker: https://github.com/cu0uz/CircaLux/issues
+RepoType: git
+Repo: https://github.com/cu0uz/CircaLux
 
 AutoUpdateMode: None
 UpdateCheckMode: None
-
 CurrentVersion: 1.0.0
 CurrentVersionCode: 1
 
