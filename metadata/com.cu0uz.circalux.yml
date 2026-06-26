@@ -6,17 +6,13 @@ SourceCode: https://github.com/cu0uz/CircaLux
 IssueTracker: https://github.com/cu0uz/CircaLux/issues
 
 Name: CircaLux
-Summary: Optimiza tu ritmo circadiano y Vitamina D
+Summary: Circadian rhythm and Vitamin D optimization
 Description: |-
-  CircaLux es una aplicación Android nativa diseñada para ayudar a los usuarios a optimizar su ritmo circadiano y monitorizar la síntesis de Vitamina D mediante sesiones de exposición solar y Terapia de Luz Roja (RLT).
-
-  Características principales:
-  * Monitorización en tiempo real de UVI, Lux y elevación solar mediante algoritmos astronómicos.
-  * Base de conocimiento científico integrada con referencias bibliográficas sobre fotobiología.
-  * Brújula solar para optimizar la exposición corporal según el acimut.
-  * Registro de salud metabólica (Glucosa, Cetonas, GKI) y composición corporal.
-  * Privacidad garantizada: Sin Google Play Services, sin rastreadores y almacenamiento 100% local.
-  * Modelo de activación mediante donación única para eliminar límites de sesión.
+  CircaLux is a native Android application designed to help users optimize their circadian rhythm and monitor Vitamin D synthesis through solar exposure and Red Light Therapy (RLT) sessions.
+  
+  It features real-time monitoring of UVI, Lux, and solar elevation using astronomical algorithms. It includes a scientific knowledge base, a solar compass for body exposure, and metabolic health tracking.
+  
+  Privacy is guaranteed with no Google Play Services, no trackers, and fully local storage.
 
 RepoType: git
 Repo: https://github.com/cu0uz/CircaLux
