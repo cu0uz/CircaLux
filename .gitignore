@@ -1,15 +1,62 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ----------------------------------------------------------------------
+# 1. DEPENDENCIAS DE NODE.JS (Requisito F-Droid)
+# ----------------------------------------------------------------------
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# ----------------------------------------------------------------------
+# 2. SEGURIDAD Y CLAVES PRIVADAS (¡CRÍTICO!)
+# ----------------------------------------------------------------------
+*.jks
+*.keystore
+*.pem
+.env
 local.properties
+android/local.properties
+google-services.json
+
+# ----------------------------------------------------------------------
+# 3. COMPILACIONES Y CACHÉ DE ANDROID / GRADLE
+# ----------------------------------------------------------------------
+.gradle/
+android/.gradle/
+build/
+android/build/
+android/app/build/
+android/app/.cxx/
+.externalNativeBuild/
+captures/
+
+# ----------------------------------------------------------------------
+# 4. BINARIOS Y EMPAQUETADOS (Prohibidos en repositorios de código)
+# ----------------------------------------------------------------------
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.jar
+*.so
+
+# ----------------------------------------------------------------------
+# 5. CONFIGURACIÓN LOCAL DE CAPACITOR
+# ----------------------------------------------------------------------
+.capacitor/
+
+# ----------------------------------------------------------------------
+# 6. ARCHIVOS DE SISTEMA OPERATIVO Y ENTORNOS (IDEs)
+# ----------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
