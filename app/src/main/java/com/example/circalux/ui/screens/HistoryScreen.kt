@@ -1,8 +1,10 @@
 package com.example.circalux.ui.screens
 
+import android.app.DatePickerDialog
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -18,15 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.circalux.data.model.SolarSession
-import com.example.circalux.data.model.RedLightSession
+import com.example.circalux.data.model.*
 import com.example.circalux.ui.theme.SolarYellow
 import com.example.circalux.ui.viewmodel.MainViewModel
+import com.example.circalux.util.NumberUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.TimeUnit
 import kotlin.math.exp
 import kotlin.math.ln
 
@@ -34,32 +39,40 @@ import kotlin.math.ln
 fun HistoryScreen(viewModel: MainViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Vitamina D", "Salud", "Medidas")
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Color(0xFF050B14),
-            contentColor = SolarYellow,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = SolarYellow
-                )
+    Scaffold(
+        containerColor = Color(0xFF050B14),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color(0xFF050B14),
+                contentColor = SolarYellow,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = SolarYellow
+                    )
+                }
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(title, fontWeight = FontWeight.Bold) }
+                    )
+                }
             }
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title, fontWeight = FontWeight.Bold) }
-                )
-            }
-        }
 
-        when (selectedTab) {
-            0 -> VitaminDTab(viewModel)
-            1 -> HealthTab(viewModel)
-            2 -> BodyTab(viewModel)
+            when (selectedTab) {
+                0 -> VitaminDTab(viewModel, snackbarHostState, scope)
+                1 -> HealthTab(viewModel, snackbarHostState, scope)
+                2 -> BodyTab(viewModel, snackbarHostState, scope)
+            }
         }
     }
 }
@@ -117,33 +130,53 @@ fun <T> SwipeToDeleteContainer(
 }
 
 @Composable
-fun VitaminDTab(viewModel: MainViewModel) {
+fun VitaminDTab(
+    viewModel: MainViewModel,
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
     val solarSessions by viewModel.solarSessions.collectAsState()
     val rltSessions by viewModel.redLightSessions.collectAsState()
     val supplementEntries by viewModel.supplementEntries.collectAsState()
     val profile by viewModel.profile.collectAsState(initial = null)
     
+    var editingSolarSession by remember { mutableStateOf<SolarSession?>(null) }
+    var editingRLTSession by remember { mutableStateOf<RedLightSession?>(null) }
+    var editingSupplement by remember { mutableStateOf<SupplementEntry?>(null) }
+    
     val baseLevel = profile?.bloodDLevel ?: 0.0
     val lastAnalyticDate = profile?.lastAnalyticDate ?: 0L
     val currentTime = System.currentTimeMillis()
     
-    val halfLifeDays = 15.0
-    val decayConstant = ln(2.0) / halfLifeDays
-    
-    val sessionIuAfterAnalytic = solarSessions
-        .filter { it.timestamp > lastAnalyticDate && it.timestamp <= currentTime }
-        .sumOf { it.vitaminDGenerated }
-        
-    val supplementIuAfterAnalytic = supplementEntries
-        .filter { it.timestamp > lastAnalyticDate && it.timestamp <= currentTime }
-        .sumOf { it.amountUI.toDouble() }
+    val halfLifeDays = 21.0 // 25(OH)D half-life is ~3 weeks
+    val dailyDecay = exp(-ln(2.0) / halfLifeDays)
+    val conversionPerIu = 0.00038 // Scientific approx: 1000 IU/day steady state yields ~10-12 ng/mL increase
 
-    val daysSinceAnalytic = if (lastAnalyticDate > 0) {
-        TimeUnit.MILLISECONDS.toDays(currentTime - lastAnalyticDate).toInt()
-    } else 0
+    // Combine all sources of Vitamin D (Sun + Supplements)
+    val allIntakes = (solarSessions.map { it.timestamp to it.vitaminDGenerated } + 
+                     supplementEntries.map { it.timestamp to it.amountUI.toDouble() })
+                     .filter { it.first > lastAnalyticDate && it.first <= currentTime }
+                     .sortedBy { it.first }
+
+    var currentEstimatedLevel = baseLevel
+    var lastProcessedTime = if (lastAnalyticDate > 0) lastAnalyticDate else {
+        if (allIntakes.isNotEmpty()) allIntakes.first().first else currentTime
+    }
     
-    val decayedBase = baseLevel * exp(-decayConstant * daysSinceAnalytic)
-    val currentEstimatedLevel = decayedBase + ((sessionIuAfterAnalytic + supplementIuAfterAnalytic) / 1000.0)
+    allIntakes.forEach { (time, iu) ->
+        val daysElapsed = (time - lastProcessedTime).toDouble() / (1000 * 60 * 60 * 24)
+        if (daysElapsed > 0) {
+            currentEstimatedLevel *= Math.pow(dailyDecay, daysElapsed)
+        }
+        currentEstimatedLevel += (iu * conversionPerIu)
+        lastProcessedTime = time
+    }
+    
+    // Final decay to now
+    val finalDaysElapsed = (currentTime - lastProcessedTime).toDouble() / (1000 * 60 * 60 * 24)
+    if (finalDaysElapsed > 0) {
+        currentEstimatedLevel *= Math.pow(dailyDecay, finalDaysElapsed)
+    }
 
     val projectionDays = 30
     val futureProjection = mutableListOf<Double>()
@@ -157,8 +190,8 @@ fun VitaminDTab(viewModel: MainViewModel) {
         }
     } else 0.0
 
-    for (i in 1..projectionDays) {
-        projectedLevel = projectedLevel * exp(-decayConstant * 1) + (dailyIuFromSupplements / 1000.0)
+    for (day in 1..projectionDays) {
+        projectedLevel = (projectedLevel * dailyDecay) + (dailyIuFromSupplements * conversionPerIu)
         futureProjection.add(projectedLevel)
     }
 
@@ -202,8 +235,11 @@ fun VitaminDTab(viewModel: MainViewModel) {
         }
         
         items(solarSessions, key = { it.id }) { session ->
-            SwipeToDeleteContainer(item = session, onDelete = { viewModel.deleteSolarSession(it) }) {
-                SolarSessionItem(it)
+            SwipeToDeleteContainer(item = session, onDelete = { 
+                viewModel.deleteSolarSession(it) 
+                scope.launch { snackbarHostState.showSnackbar("Sesión solar eliminada") }
+            }) {
+                SolarSessionItem(session, onClick = { editingSolarSession = it })
             }
         }
 
@@ -215,8 +251,11 @@ fun VitaminDTab(viewModel: MainViewModel) {
         }
 
         items(rltSessions, key = { it.id }) { session ->
-            SwipeToDeleteContainer(item = session, onDelete = { viewModel.deleteRedLightSession(it) }) {
-                RedLightSessionItem(it)
+            SwipeToDeleteContainer(item = session, onDelete = { 
+                viewModel.deleteRedLightSession(it) 
+                scope.launch { snackbarHostState.showSnackbar("Sesión RLT eliminada") }
+            }) {
+                RedLightSessionItem(session, onClick = { editingRLTSession = it })
             }
         }
 
@@ -228,17 +267,57 @@ fun VitaminDTab(viewModel: MainViewModel) {
         }
 
         items(supplementEntries, key = { it.id }) { entry ->
-            SwipeToDeleteContainer(item = entry, onDelete = { viewModel.deleteSupplementEntry(it) }) {
-                SupplementItem(it)
+            SwipeToDeleteContainer(item = entry, onDelete = { 
+                viewModel.deleteSupplementEntry(it) 
+                scope.launch { snackbarHostState.showSnackbar("Registro eliminado") }
+            }) {
+                SupplementItem(entry, onClick = { editingSupplement = it })
             }
         }
+    }
+
+    editingSolarSession?.let { session ->
+        EditSolarSessionDialog(
+            session = session,
+            onDismiss = { editingSolarSession = null },
+            onConfirm = { updated ->
+                viewModel.updateSolarSession(updated)
+                scope.launch { snackbarHostState.showSnackbar("Sesión actualizada") }
+                editingSolarSession = null
+            }
+        )
+    }
+
+    editingRLTSession?.let { session ->
+        EditRLTSessionDialog(
+            session = session,
+            onDismiss = { editingRLTSession = null },
+            onConfirm = { updated ->
+                viewModel.updateRedLightSession(updated)
+                scope.launch { snackbarHostState.showSnackbar("Sesión actualizada") }
+                editingRLTSession = null
+            }
+        )
+    }
+
+    editingSupplement?.let { entry ->
+        EditSupplementDialog(
+            entry = entry,
+            onDismiss = { editingSupplement = null },
+            onConfirm = { updated ->
+                viewModel.updateSupplementEntry(updated)
+                scope.launch { snackbarHostState.showSnackbar("Registro actualizado") }
+                editingSupplement = null
+            }
+        )
     }
 }
 
 @Composable
-fun SolarSessionItem(session: SolarSession) {
+fun SolarSessionItem(session: SolarSession, onClick: () -> Unit) {
     val date = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(session.timestamp))
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF141A26),
@@ -265,9 +344,10 @@ fun SolarSessionItem(session: SolarSession) {
 }
 
 @Composable
-fun RedLightSessionItem(session: RedLightSession) {
+fun RedLightSessionItem(session: RedLightSession, onClick: () -> Unit) {
     val date = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(session.timestamp))
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF261414),
@@ -294,9 +374,10 @@ fun RedLightSessionItem(session: RedLightSession) {
 }
 
 @Composable
-fun SupplementItem(entry: com.example.circalux.data.model.SupplementEntry) {
+fun SupplementItem(entry: SupplementEntry, onClick: () -> Unit) {
     val date = SimpleDateFormat("d MMM, yyyy", Locale.getDefault()).format(Date(entry.timestamp))
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
         color = Color(0xFF1B2614),
@@ -317,8 +398,13 @@ fun SupplementItem(entry: com.example.circalux.data.model.SupplementEntry) {
 }
 
 @Composable
-fun HealthTab(viewModel: MainViewModel) {
+fun HealthTab(
+    viewModel: MainViewModel,
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
     val metrics by viewModel.healthMetrics.collectAsState()
+    var editingMetric by remember { mutableStateOf<HealthMetric?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -342,25 +428,42 @@ fun HealthTab(viewModel: MainViewModel) {
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(metrics, key = { it.id }) { metric ->
-                SwipeToDeleteContainer(item = metric, onDelete = { viewModel.deleteHealthMetric(it) }) {
-                    HealthMetricItem(it)
+                SwipeToDeleteContainer(item = metric, onDelete = { 
+                    viewModel.deleteHealthMetric(it) 
+                    scope.launch { snackbarHostState.showSnackbar("Métrica eliminada") }
+                }) {
+                    HealthMetricItem(metric, onClick = { editingMetric = metric })
                 }
             }
         }
     }
 
     if (showAddDialog) {
-        AddHealthDialog(onDismiss = { showAddDialog = false }, onAdd = { g, k -> 
-            viewModel.addHealthMetric(g, k)
+        AddHealthDialog(onDismiss = { showAddDialog = false }, onAdd = { g, k, t -> 
+            viewModel.addHealthMetric(g, k, t)
+            scope.launch { snackbarHostState.showSnackbar("Métricas guardadas") }
             showAddDialog = false
         })
+    }
+
+    editingMetric?.let { metric ->
+        AddHealthDialog(
+            initialMetric = metric,
+            onDismiss = { editingMetric = null },
+            onAdd = { g, k, t ->
+                viewModel.updateHealthMetric(metric.copy(glucose = g, ketones = k, timestamp = t))
+                scope.launch { snackbarHostState.showSnackbar("Métrica actualizada") }
+                editingMetric = null
+            }
+        )
     }
 }
 
 @Composable
-fun HealthMetricItem(metric: com.example.circalux.data.model.HealthMetric) {
+fun HealthMetricItem(metric: HealthMetric, onClick: () -> Unit) {
     val date = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(metric.timestamp))
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF141A26)
@@ -385,13 +488,19 @@ fun HealthMetricItem(metric: com.example.circalux.data.model.HealthMetric) {
 }
 
 @Composable
-fun AddHealthDialog(onDismiss: () -> Unit, onAdd: (Double, Double) -> Unit) {
-    var glucose by remember { mutableStateOf("") }
-    var ketones by remember { mutableStateOf("") }
+fun AddHealthDialog(
+    initialMetric: HealthMetric? = null,
+    onDismiss: () -> Unit, 
+    onAdd: (Double, Double, Long) -> Unit
+) {
+    var glucose by remember { mutableStateOf(initialMetric?.glucose?.toString() ?: "") }
+    var ketones by remember { mutableStateOf(initialMetric?.ketones?.toString() ?: "") }
+    var selectedDate by remember { mutableLongStateOf(initialMetric?.timestamp ?: System.currentTimeMillis()) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Registrar Métricas") },
+        title = { Text(if (initialMetric == null) "Registrar Métricas" else "Editar Métrica") },
         text = {
             Column {
                 OutlinedTextField(
@@ -407,13 +516,39 @@ fun AddHealthDialog(onDismiss: () -> Unit, onAdd: (Double, Double) -> Unit) {
                     label = { Text("Cetonas (mmol/L)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDate)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Fecha de la toma") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = SolarYellow) },
+                        enabled = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = Color.White,
+                            disabledBorderColor = Color.White.copy(alpha = 0.2f),
+                            disabledLabelColor = Color.White.copy(alpha = 0.6f),
+                            disabledTrailingIconColor = SolarYellow
+                        )
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            calendar.set(y, m, d)
+                            selectedDate = calendar.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                    })
+                }
             }
         },
         confirmButton = {
             Button(onClick = { 
-                val g = glucose.toDoubleOrNull() ?: 0.0
-                val k = ketones.toDoubleOrNull() ?: 0.0
-                if (g > 0 && k > 0) onAdd(g, k)
+                val g = NumberUtils.parseDouble(glucose)
+                val k = NumberUtils.parseDouble(ketones)
+                if (g > 0 && k > 0) onAdd(g, k, selectedDate)
             }) { Text("GUARDAR") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } }
@@ -421,8 +556,13 @@ fun AddHealthDialog(onDismiss: () -> Unit, onAdd: (Double, Double) -> Unit) {
 }
 
 @Composable
-fun BodyTab(viewModel: MainViewModel) {
+fun BodyTab(
+    viewModel: MainViewModel,
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
     val measurements by viewModel.bodyMeasurements.collectAsState()
+    var editingItem by remember { mutableStateOf<BodyMeasurement?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -446,25 +586,44 @@ fun BodyTab(viewModel: MainViewModel) {
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(measurements, key = { it.id }) { item ->
-                SwipeToDeleteContainer(item = item, onDelete = { viewModel.deleteBodyMeasurement(it) }) {
-                    BodyMeasurementItem(item)
+                SwipeToDeleteContainer(item = item, onDelete = { 
+                    viewModel.deleteBodyMeasurement(item) 
+                    scope.launch { snackbarHostState.showSnackbar("Medición eliminada") }
+                }) {
+                    BodyMeasurementItem(item, onClick = { editingItem = item })
                 }
             }
         }
     }
 
     if (showAddDialog) {
-        AddBodyDialog(onDismiss = { showAddDialog = false }, onAdd = { neck, waist, hip, chest, biceps, thigh, weight ->
-            viewModel.addBodyMeasurement(neck, waist, hip, chest, biceps, thigh, weight)
+        AddBodyDialog(onDismiss = { showAddDialog = false }, onAdd = { n, w, h, c, b, m, weight, timestamp ->
+            viewModel.addBodyMeasurement(n, w, h, c, b, m, weight, timestamp)
+            scope.launch { snackbarHostState.showSnackbar("Medición guardada") }
             showAddDialog = false
         })
+    }
+
+    editingItem?.let { item ->
+        AddBodyDialog(
+            initialItem = item,
+            onDismiss = { editingItem = null },
+            onAdd = { n, w, h, c, b, m, weight, timestamp ->
+                viewModel.updateBodyMeasurement(item.copy(
+                    neck = n, waist = w, hip = h, chest = c, biceps = b, thigh = m, weight = weight, timestamp = timestamp
+                ))
+                scope.launch { snackbarHostState.showSnackbar("Medición actualizada") }
+                editingItem = null
+            }
+        )
     }
 }
 
 @Composable
-fun BodyMeasurementItem(item: com.example.circalux.data.model.BodyMeasurement) {
+fun BodyMeasurementItem(item: BodyMeasurement, onClick: () -> Unit) {
     val date = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(item.timestamp))
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF141A26)
@@ -490,18 +649,24 @@ fun BodyMeasurementItem(item: com.example.circalux.data.model.BodyMeasurement) {
 }
 
 @Composable
-fun AddBodyDialog(onDismiss: () -> Unit, onAdd: (Double, Double, Double, Double, Double, Double, Double) -> Unit) {
-    var neck by remember { mutableStateOf("") }
-    var waist by remember { mutableStateOf("") }
-    var hip by remember { mutableStateOf("") }
-    var chest by remember { mutableStateOf("") }
-    var biceps by remember { mutableStateOf("") }
-    var thigh by remember { mutableStateOf("") }
-    var weight by remember { mutableStateOf("") }
+fun AddBodyDialog(
+    initialItem: BodyMeasurement? = null,
+    onDismiss: () -> Unit, 
+    onAdd: (Double, Double, Double, Double, Double, Double, Double, Long) -> Unit
+) {
+    var neck by remember { mutableStateOf(initialItem?.neck?.toString() ?: "") }
+    var waist by remember { mutableStateOf(initialItem?.waist?.toString() ?: "") }
+    var hip by remember { mutableStateOf(initialItem?.hip?.toString() ?: "") }
+    var chest by remember { mutableStateOf(initialItem?.chest?.toString() ?: "") }
+    var biceps by remember { mutableStateOf(initialItem?.biceps?.toString() ?: "") }
+    var thigh by remember { mutableStateOf(initialItem?.thigh?.toString() ?: "") }
+    var weight by remember { mutableStateOf(initialItem?.weight?.toString() ?: "") }
+    var selectedDate by remember { mutableLongStateOf(initialItem?.timestamp ?: System.currentTimeMillis()) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Registrar Medidas") },
+        title = { Text(if (initialItem == null) "Registrar Medidas" else "Editar Medidas") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 val fields = listOf(
@@ -514,26 +679,250 @@ fun AddBodyDialog(onDismiss: () -> Unit, onAdd: (Double, Double, Double, Double,
                     "Peso (kg)" to { v: String -> weight = v }
                 )
                 fields.forEach { (label, setter) ->
+                    val value = when {
+                        label.startsWith("Cuello") -> neck
+                        label.startsWith("Cintura") -> waist
+                        label.startsWith("Cadera") -> hip
+                        label.startsWith("Pecho") -> chest
+                        label.startsWith("Bíceps") -> biceps
+                        label.startsWith("Muslo") -> thigh
+                        else -> weight
+                    }
                     OutlinedTextField(
-                        value = if (label.startsWith("Cuello")) neck else if (label.startsWith("Cintura")) waist else if (label.startsWith("Cadera")) hip else if (label.startsWith("Pecho")) chest else if (label.startsWith("Bíceps")) biceps else if (label.startsWith("Muslo")) thigh else weight,
+                        value = value,
                         onValueChange = setter,
                         label = { Text(label) },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    OutlinedTextField(
+                        value = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDate)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Fecha de la medición") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = SolarYellow) },
+                        enabled = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = Color.White,
+                            disabledBorderColor = Color.White.copy(alpha = 0.2f),
+                            disabledLabelColor = Color.White.copy(alpha = 0.6f),
+                            disabledTrailingIconColor = SolarYellow
+                        )
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            calendar.set(y, m, d)
+                            selectedDate = calendar.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                    })
                 }
             }
         },
         confirmButton = {
             Button(onClick = { 
                 onAdd(
-                    neck.toDoubleOrNull() ?: 0.0,
-                    waist.toDoubleOrNull() ?: 0.0,
-                    hip.toDoubleOrNull() ?: 0.0,
-                    chest.toDoubleOrNull() ?: 0.0,
-                    biceps.toDoubleOrNull() ?: 0.0,
-                    thigh.toDoubleOrNull() ?: 0.0,
-                    weight.toDoubleOrNull() ?: 0.0
+                    NumberUtils.parseDouble(neck),
+                    NumberUtils.parseDouble(waist),
+                    NumberUtils.parseDouble(hip),
+                    NumberUtils.parseDouble(chest),
+                    NumberUtils.parseDouble(biceps),
+                    NumberUtils.parseDouble(thigh),
+                    NumberUtils.parseDouble(weight),
+                    selectedDate
                 )
+            }) { Text("GUARDAR") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } }
+    )
+}
+
+@Composable
+fun EditSolarSessionDialog(
+    session: SolarSession,
+    onDismiss: () -> Unit,
+    onConfirm: (SolarSession) -> Unit
+) {
+    var duration by remember { mutableStateOf(session.durationMinutes.toString()) }
+    var uvi by remember { mutableStateOf(session.uviAvg.toString()) }
+    var selectedDate by remember { mutableLongStateOf(session.timestamp) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Sesión Solar") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = duration,
+                    onValueChange = { duration = it },
+                    label = { Text("Duración (min)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = uvi,
+                    onValueChange = { uvi = it },
+                    label = { Text("UVI Promedio") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(selectedDate)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Fecha y Hora") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = SolarYellow) },
+                        enabled = false
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            calendar.set(y, m, d)
+                            selectedDate = calendar.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                    })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val d = NumberUtils.parseInt(duration)
+                val u = NumberUtils.parseDouble(uvi)
+                onConfirm(session.copy(durationMinutes = d, uviAvg = u, timestamp = selectedDate))
+            }) { Text("GUARDAR") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } }
+    )
+}
+
+@Composable
+fun EditRLTSessionDialog(
+    session: RedLightSession,
+    onDismiss: () -> Unit,
+    onConfirm: (RedLightSession) -> Unit
+) {
+    var duration by remember { mutableStateOf(session.durationMinutes.toString()) }
+    var power by remember { mutableStateOf(session.lampPowerWatts.toString()) }
+    var distance by remember { mutableStateOf(session.distanceCm.toString()) }
+    var selectedDate by remember { mutableLongStateOf(session.timestamp) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Sesión Luz Roja") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = duration,
+                    onValueChange = { duration = it },
+                    label = { Text("Duración (min)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = power,
+                    onValueChange = { power = it },
+                    label = { Text("Potencia (W)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = distance,
+                    onValueChange = { distance = it },
+                    label = { Text("Distancia (cm)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(selectedDate)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Fecha y Hora") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = SolarYellow) },
+                        enabled = false
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            calendar.set(y, m, d)
+                            selectedDate = calendar.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                    })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm(session.copy(
+                    durationMinutes = NumberUtils.parseInt(duration),
+                    lampPowerWatts = NumberUtils.parseInt(power),
+                    distanceCm = NumberUtils.parseInt(distance),
+                    timestamp = selectedDate
+                ))
+            }) { Text("GUARDAR") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } }
+    )
+}
+
+@Composable
+fun EditSupplementDialog(
+    entry: SupplementEntry,
+    onDismiss: () -> Unit,
+    onConfirm: (SupplementEntry) -> Unit
+) {
+    var amountUI by remember { mutableStateOf(entry.amountUI.toString()) }
+    var selectedDate by remember { mutableLongStateOf(entry.timestamp) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Registro Suplemento") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = amountUI,
+                    onValueChange = { amountUI = it },
+                    label = { Text("Cantidad (UI)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDate)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Fecha") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = SolarYellow) },
+                        enabled = false
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable {
+                        val calendar = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            calendar.set(y, m, d)
+                            selectedDate = calendar.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                    })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm(entry.copy(
+                    amountUI = NumberUtils.parseInt(amountUI),
+                    timestamp = selectedDate
+                ))
             }) { Text("GUARDAR") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } }

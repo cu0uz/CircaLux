@@ -42,7 +42,7 @@ fun SensorStatusScreen(viewModel: MainViewModel) {
         SensorItem(label = "Longitud", value = String.format("%.5f", viewModel.longitude))
         
         val weather = viewModel.weatherData
-        SensorItem(label = "UVI Actual", value = String.format("%.1f", weather?.current?.uvIndex ?: 0.0))
+        SensorItem(label = "UVI Actual (Validado)", value = String.format("%.1f", viewModel.currentUvi))
         SensorItem(label = "UVI Máximo Hoy", value = String.format("%.1f", weather?.daily?.uvIndexMax?.firstOrNull() ?: 0.0))
         SensorItem(label = "Temperatura Actual", value = "${weather?.current?.temperature ?: "--"} °C")
         

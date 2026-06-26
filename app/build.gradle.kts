@@ -19,17 +19,33 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("/Users/cu0uz/Downloads/KEY APP ANDROID/Untitled.jks")
+            storePassword = "GyCh\$q3iuBqw@"
+            keyAlias = "cu0uz"
+            keyPassword = "GyCh\$q3iuBqw@"
+        }
+    }
+
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+            
             optimization {
                 enable = false
             }
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
@@ -51,10 +67,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    
-    // Location
-    implementation(libs.play.services.location)
-    implementation(libs.kotlinx.coroutines.play.services)
     
     // Network
     implementation(libs.retrofit)

@@ -7,4 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="deep_blue">#0B1F3A</color>
+    <color name="solar_yellow">#FFD84A</color>
+    <color name="solar_orange">#FF8A3D</color>
+    <color name="night_violet">#5A4FCF</color>
+    <color name="dark_background">#050B14</color>
 </resources>

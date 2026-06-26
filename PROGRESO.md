@@ -14,6 +14,7 @@ Este documento detalla todas las funcionalidades implementadas, las mejoras de d
     - **Horizonte:** Apertura del 15% en la base para simbolizar la conexión con el mundo real.
     - **Trayectoria:** Curva minimalista (sonrisa) flotando bajo el anillo.
     - **Punto de Momento Actual:** Indicador con efecto *glow* que recorre el anillo en tiempo real.
+- [x] **Icono de App Nativo:** Recreación del logo como icono adaptativo Android con soporte para iconos con tema (Monochrome).
 - [x] **UI Sticky:** La barra superior (TopBar) y el logo permanecen siempre visibles durante el scroll para acceso inmediato al menú y navegación.
 - [x] **Sistema de Logging (CircaLogger):**
     - Implementación de registros detallados guardados en `filesDir`.
@@ -24,49 +25,43 @@ Este documento detalla todas las funcionalidades implementadas, las mejoras de d
 
 ### PASO 2: Home Screen (Monitorización y Sesiones)
 - [x] **Sensores en Tiempo Real:**
-    - Lectura de **Luminancia (Lux)** ambiental constante.
-    - Localización GPS dinámica: Actualización automática de datos globales si el usuario se desplaza más de 1km.
+    - Lectura de **Luminancia (Lux)** ambiental constante con UI optimizada.
+    - Localización GPS dinámica: Actualización automática de datos globales y visualización de coordenadas en Home.
 - [x] **Datos Astronómicos y Climáticos:**
     - Hora, fecha, temperatura y estado del tiempo actual.
     - Horas exactas de salida y puesta de sol según ubicación.
     - Pronóstico de 7 días (Día, UVI Max, Temp Max, Clima).
 - [x] **Brújula Solar Interactiva:**
     - Utiliza el magnetómetro y acelerómetro para orientar al usuario hacia el sol.
-    - Indicadores visuales: "Gira a la derecha/izquierda" y confirmación "¡ESTÁS DE CARA AL SOL!".
+    - Indicadores visuales y confirmación "¡ESTÁS DE CARA AL SOL!".
 - [x] **Gestión de Sesiones Sol/Luz Roja:**
-    - **Sesión Solar:** Selección de exposición (10% a 100%), recordatorios de "Darse la vuelta" cada 10 min, cálculo de Vitamina D generada por minuto.
+    - **Sesión Solar:** Selección de exposición mediante etiquetas descriptivas (Cara/Manos, Camiseta, Bañador, etc.), recordatorios de cambio de posición cada 10 min.
     - **Sesión RLT:** Ajustes de potencia (W) y distancia (cm) específicos para terapia de luz roja.
-    - **Guardado Inteligente:** Posibilidad de descartar sesión o guardarla con selección del estado del tiempo manual para corregir discrepancias.
+    - **Guardado Inteligente:** Diálogos de confirmación y selección de estado del tiempo manual.
 - [x] **Precisión UVI y MED:**
-    - **Leyenda Dinámica:** La escala UVI muestra tiempos MED y consejos basados estrictamente en el **Fototipo de Fitzpatrick** del perfil.
-    - **Colores Oficiales:** Sincronización cromática según la escala de la OMS (Verde, Amarillo, Naranja, Rojo, Púrpura).
+    - **Solar Elevation Guard:** Validación del UVI basada en la elevación solar real para evitar lecturas falsas al atardecer/amanecer.
+    - **Colores Oficiales:** Sincronización cromática según la escala de la OMS.
 
 ---
 
 ### PASO 3: Historial y Proyecciones Avanzadas
 - [x] **Cálculo de Vitamina D (Ciencia Aplicada):**
     - Algoritmo basado en: `[Nivel Base] + [Síntesis Solar] + [Suplementos] - [Decaimiento Biológico]`.
-    - **Vida Media:** Se aplica una disminución biológica basada en una vida media de 15 días si no hay ingesta.
 - [x] **Proyección a 30 días:** Gráfica Sparkline que estima niveles futuros basada en el comportamiento actual.
 - [x] **Métricas de Salud y Físicas:**
-    - Registro de Glucosa, Cetonas y cálculo automático de **GKI**.
-    - Medidas corporales (Cuello, Cintura, etc.) con cálculo automático de **WHtR** y **% Grasa Corporal (Método Navy)**.
-- [x] **Gestión de Datos:** Implementación de gestos **Swipe-to-Delete** para borrar cualquier entrada del historial (incluyendo tomas de suplementos).
+    - Registro de Glucosa, Cetonas y medidas corporales.
+    - **Fechas Retroactivas:** Posibilidad de elegir la fecha exacta al añadir métricas o medidas manualmente.
+- [x] **Gestión de Datos:** Implementación de gestos **Swipe-to-Delete** con confirmación visual vía Snackbar.
 
 ---
 
 ### PASO 4: Perfil, Ajustes y Fidelización
-- [x] **Perfil de Usuario:** Datos antropométricos, fecha de última analítica y configuración de suplementos.
-- [x] **Suplementos Retroactivos:** Generación automática de tomas diarias desde la fecha de inicio indicada para poblar el historial fielmente.
-- [x] **Sistema de Alertas:**
-    - Alarmas sonoras al alcanzar el límite MED de seguridad.
-    - Alertas de apertura/cierre de la ventana de Vitamina D (UVI > 3.0).
-    - Avisos 10 min antes del amanecer/anochecer.
-- [x] **Backups:** Sistema de exportación e importación CSV mediante `OpenDocument` para persistencia total sin nube.
-- [x] **Sistema de Activación (Trial):**
-    - Límite de 10 sesiones solares en modo gratuito.
-    - Generación de User ID único y sistema de validación por Checksum (ASCII % 99).
-- [x] **Menú Lateral:** Acceso a Historial, Perfil, Ajustes, Blog "Manifiesto Jota" y **Estado de Sensores** (Lux, GPS, Magnetómetro, Test de Audio).
+- [x] **Perfil de Usuario:** Datos antropométricos, gestión de suplementos y fototipo Fitzpatrick.
+- [x] **Acerca de (About):** Nueva sección con descargo de responsabilidad legal y base científica del proyecto.
+- [x] **Sistema de Feedback:** Snackbars de confirmación en todas las acciones de guardado y borrado.
+- [x] **Backups:** Sistema de exportación e importación CSV con confirmación de estado.
+- [x] **Blog "Manifiesto Jota":** WebView optimizado con carga rápida, caché y scroll fluido mediante aceleración por hardware.
+- [x] **Sistema de Activación (Trial):** Límite de 10 sesiones solares en modo gratuito con validación por Checksum.
 
 ---
 
@@ -76,11 +71,14 @@ Este documento detalla todas las funcionalidades implementadas, las mejoras de d
 | :--- | :--- |
 | **Ángulo Solar Inexacto:** Desfase de ~22° en la elevación. | Migración a fórmulas astronómicas basadas en **Tiempo UTC**, eliminando errores de zona horaria local. |
 | **UVI Discrepante:** Mostraba el máximo diario (7.9) en lugar del actual (4.0). | Cambio en la API para solicitar el **índice UVI instantáneo** en tiempo real. |
+| **UVI Sticking:** Valores altos (4.9) al atardecer cuando debería ser < 3. | Implementación de **Solar Elevation Guard**: Validación cruzada del UVI vs elevación solar real (sin(elev)^1.5) para forzar 0.0 tras el ocaso. |
+| **Notificaciones Descompasadas:** Avisos de UVI alto al despertar la app por la mañana. | Implementación de **Stale Data Protection**: El monitoreo ahora refresca datos secuencialmente y descarta lecturas con más de 1 hora de antigüedad. |
 | **Pérdida de Sesiones Suplementos:** Días omitidos en el backfill automático. | Normalización de calendarios a `00:00:00.000` para asegurar un registro por día exacto. |
 | **Fallo en Restauración CSV:** Error de permisos en Android 13+. | Implementación de `ActivityResultContracts.OpenDocument()` para acceso seguro a archivos. |
 | **Brújula Estática:** No respondía al giro del usuario. | Creación de `OrientationManager` combinando magnetómetro y acelerómetro para rumbo (Heading) real. |
 | **Consumo de Batería:** Sensores activos innecesariamente. | Implementación de `onCleared` y gestión de ciclos de vida para detener sensores al cerrar la app. |
-| **Migración Room:** Crash al añadir campos de RLT y Suplementos. | Migración manual de base de datos a Versión 4 con `fallbackToDestructiveMigration` para estabilidad. |
+| **WebView Lento/Trabado:** Scroll dificultoso en el blog. | Activación de **DOM Storage** y **Aceleración por Hardware** para renderizado fluido. |
+| **Icono de Inicio Genérico:** No mostraba el logo de la app. | Recreación del logo en formato **Vectorial Nativo (Adaptive Icon)** con soporte para temas de sistema. |
 
 ---
 **CircaLux v1.0.0** - Creado con IA por cu0uz en 2026.

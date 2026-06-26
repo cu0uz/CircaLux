@@ -64,10 +64,17 @@ fun SolarSessionControls(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val percentages = listOf(0.1, 0.3, 0.5, 0.7, 1.0)
-                percentages.forEach { pct ->
+                val percentages = listOf(
+                    0.1 to "Cara/Manos",
+                    0.3 to "Camiseta",
+                    0.5 to "Pantalón",
+                    0.7 to "Bañador",
+                    1.0 to "Total"
+                )
+                percentages.forEach { (pct, label) ->
                     ExposureChip(
-                        label = "${(pct * 100).toInt()}%",
+                        pct = pct,
+                        desc = label,
                         isSelected = exposure == pct,
                         onClick = { onExposureChange(pct) },
                         modifier = Modifier.weight(1f)
@@ -98,27 +105,43 @@ fun SolarSessionControls(
 
 @Composable
 fun ExposureChip(
-    label: String,
+    pct: Double,
+    desc: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Column(
         modifier = modifier
-            .padding(horizontal = 4.dp)
-            .height(40.dp)
-            .background(
-                color = if (isSelected) SolarYellow else Color(0xFF232B39),
-                shape = RoundedCornerShape(12.dp)
-            )
+            .padding(horizontal = 2.dp)
             .clickable { onClick() },
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(
+                    color = if (isSelected) SolarYellow else Color(0xFF232B39),
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "${(pct * 100).toInt()}%",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.6f)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.6f)
+            text = desc,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (isSelected) SolarYellow else Color.White.copy(alpha = 0.4f),
+            maxLines = 1
         )
     }
 }

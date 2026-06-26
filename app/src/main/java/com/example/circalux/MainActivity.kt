@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
                     ModalNavigationDrawer(
                         drawerState = drawerState,
+                        gesturesEnabled = currentScreen != "manifesto", // Disable swipe gesture on blog to avoid scroll conflicts
                         drawerContent = {
                             ModalDrawerSheet(
                                 drawerContainerColor = Color(0xFF050B14),
@@ -93,8 +94,8 @@ class MainActivity : ComponentActivity() {
                                     contentAlignment = Alignment.BottomStart
                                 ) {
                                     Column {
-                                        CircaLuxLogo(size = 60.dp)
-                                        Spacer(modifier = Modifier.height(12.dp))
+                                        CircaLuxAppIcon(size = 64.dp)
+                                        Spacer(modifier = Modifier.height(16.dp))
                                         Text(
                                             "CircaLux", 
                                             style = MaterialTheme.typography.headlineMedium,
@@ -109,10 +110,10 @@ class MainActivity : ComponentActivity() {
 
                                 val navItems = listOf(
                                     Triple("Home", "home", Icons.Default.Home),
-                                    Triple("Historial", "history", Icons.Default.History),
-                                    Triple("Perfil", "profile", Icons.Default.Person),
-                                    Triple("Manifiesto Jota", "manifesto", Icons.Default.Description),
-                                    Triple("Estado Sensores", "sensors", Icons.Default.CompassCalibration),
+                                    Triple("Historial y Gráficas", "history", Icons.Default.History),
+                                    Triple("Mi Perfil y Activación", "profile", Icons.Default.Person),
+                                    Triple("Blog Jota Manifesto", "manifesto", Icons.Default.Description),
+                                    Triple("Estado de Sensores", "sensors", Icons.Default.CompassCalibration),
                                     Triple("Ajustes", "settings", Icons.Default.Settings)
                                 )
 
@@ -136,6 +137,21 @@ class MainActivity : ComponentActivity() {
                                 Spacer(modifier = Modifier.weight(1f))
 
                                 val context = LocalContext.current
+                                NavigationDrawerItem(
+                                    label = { Text("Acerca de", fontWeight = FontWeight.SemiBold) },
+                                    selected = currentScreen == "about",
+                                    onClick = { currentScreen = "about"; scope.launch { drawerState.close() } },
+                                    icon = { Icon(Icons.Default.Info, null) },
+                                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                                    colors = NavigationDrawerItemDefaults.colors(
+                                        selectedContainerColor = SolarYellow.copy(alpha = 0.15f),
+                                        selectedIconColor = SolarYellow,
+                                        selectedTextColor = SolarYellow,
+                                        unselectedIconColor = Color.White.copy(alpha = 0.6f),
+                                        unselectedTextColor = Color.White.copy(alpha = 0.6f)
+                                    )
+                                )
+
                                 NavigationDrawerItem(
                                     label = { Text("Reportar Error", fontWeight = FontWeight.SemiBold) },
                                     selected = false,
@@ -169,8 +185,9 @@ class MainActivity : ComponentActivity() {
                         }
                     ) {
                         Scaffold(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().imePadding(),
                             containerColor = Color(0xFF050B14),
+                            contentWindowInsets = WindowInsets.systemBars,
                             topBar = {
                                 CircaLuxTopBar(
                                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -187,16 +204,74 @@ class MainActivity : ComponentActivity() {
                         ) { innerPadding ->
                             Box(modifier = Modifier.padding(innerPadding)) {
                                 when (currentScreen) {
-                                    "home" -> HomeScreen(
-                                        viewModel, 
-                                        onUviClick = { showUviLegend = true },
-                                        onShowTip = { activeTipKey = it }
-                                    )
+                                    "home" -> {
+                                        var showLuxExplanation by remember { mutableStateOf(false) }
+                                        var showSunTimesExplanation by remember { mutableStateOf(false) }
+                                        var showSunAngleExplanation by remember { mutableStateOf(false) }
+                                        var showSunCompassExplanation by remember { mutableStateOf(false) }
+
+                                        HomeScreen(
+                                            viewModel,
+                                            onUviClick = { showUviLegend = true },
+                                            onLuxClick = { showLuxExplanation = true },
+                                            onSunTimesClick = { showSunTimesExplanation = true },
+                                            onSunAngleClick = { showSunAngleExplanation = true },
+                                            onSunCompassClick = { showSunCompassExplanation = true },
+                                            onShowTip = { activeTipKey = it }
+                                        )
+
+                                        if (showLuxExplanation) {
+                                            MetricExplanationDialog(
+                                                metricKey = "luminancia",
+                                                currentValue = String.format("%.0f", viewModel.luxValue.collectAsState().value),
+                                                unit = "Lux",
+                                                onDismiss = { showLuxExplanation = false }
+                                            )
+                                        }
+                                        if (showSunTimesExplanation) {
+                                            val weather = viewModel.weatherData
+                                            val sunrise = weather?.daily?.sunrise?.firstOrNull()?.split("T")?.lastOrNull() ?: "--:--"
+                                            val sunset = weather?.daily?.sunset?.firstOrNull()?.split("T")?.lastOrNull() ?: "--:--"
+                                            MetricExplanationDialog(
+                                                metricKey = "amanecer_atardecer",
+                                                currentValue = "$sunrise / $sunset",
+                                                unit = "Horas",
+                                                onDismiss = { showSunTimesExplanation = false }
+                                            )
+                                        }
+                                        if (showSunAngleExplanation) {
+                                            val sunElevation = SolarCalculator.calculateSunElevation(viewModel.latitude, viewModel.longitude)
+                                            MetricExplanationDialog(
+                                                metricKey = "angulo_solar",
+                                                currentValue = "${String.format("%.1f", sunElevation)}°",
+                                                unit = "Grados",
+                                                onDismiss = { showSunAngleExplanation = false }
+                                            )
+                                        }
+                                        if (showSunCompassExplanation) {
+                                            val deviceHeading by viewModel.deviceHeading.collectAsState()
+                                            val sunAzimuth = SolarCalculator.calculateSunAzimuth(viewModel.latitude, viewModel.longitude)
+                                            val diff = (sunAzimuth - deviceHeading + 360) % 360
+                                            MetricExplanationDialog(
+                                                metricKey = "brujula_solar",
+                                                currentValue = "${String.format("%.0f", diff)}°",
+                                                unit = "Desvío Sol",
+                                                onDismiss = { showSunCompassExplanation = false },
+                                                visualContent = {
+                                                    SolarCompass(
+                                                        sunAzimuth = sunAzimuth.toFloat(),
+                                                        deviceHeading = deviceHeading
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
                                     "history" -> HistoryScreen(viewModel)
                                     "profile" -> ProfileScreen(viewModel)
                                     "settings" -> SettingsScreen(viewModel)
                                     "manifesto" -> ManifestoScreen()
                                     "sensors" -> SensorStatusScreen(viewModel)
+                                    "about" -> AboutScreen()
                                 }
                             }
 
@@ -356,13 +431,17 @@ class MainActivity : ComponentActivity() {
 fun HomeScreen(
     viewModel: MainViewModel, 
     onUviClick: () -> Unit,
+    onLuxClick: () -> Unit,
+    onSunTimesClick: () -> Unit,
+    onSunAngleClick: () -> Unit,
+    onSunCompassClick: () -> Unit,
     onShowTip: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val profile by viewModel.profile.collectAsState()
     val skinType = profile?.skinType ?: viewModel.skinType
     val weather = viewModel.weatherData
-    val currentUvi = weather?.current?.uvIndex ?: 0.0
+    val currentUvi = viewModel.currentUvi
     val temp = weather?.current?.temperature ?: 0.0
     val lux by viewModel.luxValue.collectAsState()
     val deviceHeading by viewModel.deviceHeading.collectAsState()
@@ -383,44 +462,73 @@ fun HomeScreen(
         }
 
         item {
-            Surface(
-                modifier = Modifier.padding(16.dp),
-                color = Color(0xFF0F1724),
-                shape = RoundedCornerShape(28.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        UviCard(uvi = currentUvi, skinType = skinType, onClick = onUviClick, modifier = Modifier.weight(1f))
-                        LuxCard(lux = lux, modifier = Modifier.weight(1f))
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        SolarInfoCard(label = "Amanecer", value = sunrise, modifier = Modifier.weight(1f))
-                        SolarInfoCard(label = "Atardecer", value = sunset, modifier = Modifier.weight(1f))
-                    }
-                    
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        SolarInfoCard(label = "Ángulo Solar", value = "${String.format("%.0f", sunElevation)}°", modifier = Modifier.weight(1f))
-                        SolarInfoCard(label = "Brújula Sol", value = "", modifier = Modifier.weight(1f)) {
-                            SolarCompass(
-                                sunAzimuth = sunAzimuth.toFloat(),
-                                deviceHeading = deviceHeading
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    UviCard(uvi = currentUvi, skinType = skinType, onClick = onUviClick, modifier = Modifier.weight(1f))
+                    LuxCard(lux = lux, onClick = onLuxClick, modifier = Modifier.weight(1f))
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    color = Color(0xFF0F1724),
+                    shape = RoundedCornerShape(28.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onSunTimesClick() }
+                        ) {
+                            SolarInfoCard(label = "Amanecer", value = sunrise, modifier = Modifier.weight(1f))
+                            SolarInfoCard(label = "Atardecer", value = sunset, modifier = Modifier.weight(1f))
+                        }
+                        
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            SolarInfoCard(
+                                label = "Ángulo Solar", 
+                                value = "${String.format("%.1f", sunElevation)}°", 
+                                modifier = Modifier.weight(1f).clickable { onSunAngleClick() }
+                            )
+                            SolarInfoCard(
+                                label = "Brújula Sol", 
+                                value = "", 
+                                modifier = Modifier.weight(1f).clickable { onSunCompassClick() }
+                            ) {
+                                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                    SolarCompass(
+                                        sunAzimuth = sunAzimuth.toFloat(),
+                                        deviceHeading = deviceHeading
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Ubicación Actual
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn, 
+                                contentDescription = null, 
+                                tint = SolarYellow.copy(alpha = 0.5f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "UBICACIÓN: ${String.format("%.4f", viewModel.latitude)}, ${String.format("%.4f", viewModel.longitude)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "LAT: ${String.format("%.2f", viewModel.latitude)} LNG: ${String.format("%.2f", viewModel.longitude)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
                 }
             }
         }

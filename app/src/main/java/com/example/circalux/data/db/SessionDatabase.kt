@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSolarSession(session: SolarSession)
 
     @Query("SELECT * FROM solar_sessions ORDER BY timestamp DESC")
@@ -15,7 +15,7 @@ interface SessionDao {
     @Delete
     suspend fun deleteSolarSession(session: SolarSession)
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRedLightSession(session: RedLightSession)
 
     @Query("SELECT * FROM red_light_sessions ORDER BY timestamp DESC")
@@ -25,7 +25,7 @@ interface SessionDao {
     suspend fun deleteRedLightSession(session: RedLightSession)
 
     // Health Metrics
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHealthMetric(metric: HealthMetric)
 
     @Query("SELECT * FROM health_metrics ORDER BY timestamp DESC")
@@ -35,7 +35,7 @@ interface SessionDao {
     suspend fun deleteHealthMetric(metric: HealthMetric)
 
     // Body Measurements
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBodyMeasurement(measurement: BodyMeasurement)
 
     @Query("SELECT * FROM body_measurements ORDER BY timestamp DESC")

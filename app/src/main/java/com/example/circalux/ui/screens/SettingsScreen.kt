@@ -19,85 +19,100 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.circalux.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
-        uri?.let { viewModel.exportBackup(it) }
+        uri?.let { 
+            viewModel.exportBackup(it)
+            scope.launch { snackbarHostState.showSnackbar("Copia de seguridad exportada") }
+        }
     }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { viewModel.importBackup(it) }
+        uri?.let { 
+            viewModel.importBackup(it)
+            scope.launch { snackbarHostState.showSnackbar("Datos importados con éxito") }
+        }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(scrollState)
-    ) {
-        Text(
-            "Ajustes", 
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1724))
+    Scaffold(
+        containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+                .verticalScroll(scrollState)
         ) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                SettingItem(
-                    title = "Exportar Copia (CSV)",
-                    subtitle = "Guarda tu historial en un archivo",
-                    icon = Icons.Default.FileUpload,
-                    onClick = { exportLauncher.launch("circalux_backup.csv") }
-                )
+            Text(
+                "Ajustes", 
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(24.dp))
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1724))
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    SettingItem(
+                        title = "Exportar Copia (CSV)",
+                        subtitle = "Guarda tu historial en un archivo",
+                        icon = Icons.Default.FileUpload,
+                        onClick = { exportLauncher.launch("circalux_backup.csv") }
+                    )
 
-                SettingItem(
-                    title = "Importar Copia (CSV)",
-                    subtitle = "Restaura tus datos desde un archivo",
-                    icon = Icons.Default.FileDownload,
-                    onClick = { importLauncher.launch(arrayOf("*/*")) }
-                )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+                    SettingItem(
+                        title = "Importar Copia (CSV)",
+                        subtitle = "Restaura tus datos desde un archivo",
+                        icon = Icons.Default.FileDownload,
+                        onClick = { importLauncher.launch(arrayOf("*/*")) }
+                    )
 
-                SettingItem(
-                    title = "Notificaciones",
-                    subtitle = "Alertas de amanecer y UVI",
-                    icon = Icons.Default.Notifications,
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+
+                    SettingItem(
+                        title = "Notificaciones",
+                        subtitle = "Alertas de amanecer y UVI",
+                        icon = Icons.Default.Notifications,
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(intent)
                         }
-                        context.startActivity(intent)
-                    }
-                )
+                    )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.1f))
 
-                SettingItem(
-                    title = "Optimización de Batería",
-                    subtitle = "Asegurar avisos en segundo plano",
-                    icon = Icons.Default.BatteryAlert,
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                        context.startActivity(intent)
-                    }
-                )
+                    SettingItem(
+                        title = "Optimización de Batería",
+                        subtitle = "Asegurar avisos en segundo plano",
+                        icon = Icons.Default.BatteryAlert,
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            context.startActivity(intent)
+                        }
+                    )
+                }
             }
         }
     }

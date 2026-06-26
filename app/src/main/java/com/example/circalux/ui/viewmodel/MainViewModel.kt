@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.*
 import java.util.concurrent.TimeUnit
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -45,6 +45,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     var weatherData by mutableStateOf<WeatherResponse?>(null)
         private set
+
+    val currentUvi: Double
+        get() {
+            val data = weatherData ?: return 0.0
+            
+            // Check if data is stale (older than 1 hour)
+            // Time format: 2024-06-25T07:00
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.getDefault())
+                val dataTime = sdf.parse(data.current?.time ?: "")?.time ?: 0L
+                if (System.currentTimeMillis() - dataTime > 3600000) return 0.0
+            } catch (e: Exception) { }
+
+            val apiUvi = data.current?.uvIndex ?: 0.0
+            val elevation = SolarCalculator.calculateSunElevation(latitude, longitude)
+            if (elevation <= 0) return 0.0
+            
+            // Refined Solar Guard: UVI is physically limited by the sine of elevation 
+            // due to atmospheric path length. Power of 1.5 accounts for extra scattering at low angles.
+            val maxPossible = 12.5 * Math.pow(kotlin.math.sin(Math.toRadians(elevation)), 1.5)
+            return apiUvi.coerceAtMost(maxPossible)
+        }
 
     var latitude by mutableStateOf(0.0)
     var longitude by mutableStateOf(0.0)
@@ -90,12 +112,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         
         // Observe location changes continuously
         viewModelScope.launch {
-            locationManager.getLocationUpdates().collect { loc ->
-                latitude = loc.latitude
-                longitude = loc.longitude
-                weatherData = weatherRepository.fetchWeather(loc.latitude, loc.longitude)
-                checkSunriseSunsetReminders()
-                CircaLogger.d("Auto-updated location and weather for: ${loc.latitude}, ${loc.longitude}", "MainViewModel")
+            try {
+                locationManager.getLocationUpdates().collect { loc ->
+                    latitude = loc.latitude
+                    longitude = loc.longitude
+                    weatherData = weatherRepository.fetchWeather(loc.latitude, loc.longitude)
+                    checkSunriseSunsetReminders()
+                    CircaLogger.d("Auto-updated location and weather for: ${loc.latitude}, ${loc.longitude}", "MainViewModel")
+                }
+            } catch (e: Exception) {
+                CircaLogger.e("Location updates flow failed", e, "MainViewModel")
             }
         }
 
@@ -159,11 +185,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshLocationAndWeather() {
         viewModelScope.launch {
-            val loc = locationManager.fetchLocation()
-            loc?.let {
-                latitude = it.latitude
-                longitude = it.longitude
-                weatherData = weatherRepository.fetchWeather(it.latitude, it.longitude)
+            performWeatherRefresh()
+        }
+    }
+
+    private suspend fun performWeatherRefresh() {
+        val loc = locationManager.fetchLocation()
+        if (loc != null) {
+            latitude = loc.latitude
+            longitude = loc.longitude
+        }
+        
+        if (latitude != 0.0 || longitude != 0.0) {
+            val response = weatherRepository.fetchWeather(latitude, longitude)
+            if (response != null) {
+                weatherData = response
                 checkSunriseSunsetReminders()
             }
         }
@@ -219,20 +255,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startWeatherMonitoring() {
         viewModelScope.launch {
-            var wasUviHigh = false
+            // Wait for initial data and set initial state without notifying
+            while (weatherData == null) {
+                performWeatherRefresh()
+                if (weatherData == null) delay(30000) // Retry every 30s if no internet/gps
+            }
+            
+            var wasUviHigh = currentUvi >= 3.0
+            
             while (true) {
-                val currentUvi = weatherData?.daily?.uvIndexMax?.firstOrNull() ?: 0.0
-                val isUviHigh = currentUvi >= 3.0
+                delay(TimeUnit.MINUTES.toMillis(10))
+                performWeatherRefresh()
+                
+                val uvi = currentUvi
+                val isUviHigh = uvi >= 3.0
                 
                 if (isUviHigh && !wasUviHigh) {
-                    notificationHelper.sendAlarm("¡Ventana de Vitamina D abierta!", "El UVI es de ${String.format("%.1f", currentUvi)}, momento ideal para tomar el sol.")
+                    val elevation = SolarCalculator.calculateSunElevation(latitude, longitude)
+                    notificationHelper.sendUviNotification(
+                        "¡Ventana de Vitamina D abierta!", 
+                        "UVI: ${String.format("%.1f", uvi)} (Sol a ${String.format("%.0f", elevation)}°). Momento ideal para síntesis."
+                    )
                 } else if (!isUviHigh && wasUviHigh) {
-                    notificationHelper.sendAlarm("Ventana de Vitamina D cerrada", "El UVI ha bajado de 3.0.")
+                    notificationHelper.sendUviNotification(
+                        "Ventana de Vitamina D cerrada", 
+                        "El UVI ha bajado de 3.0."
+                    )
                 }
                 
                 wasUviHigh = isUviHigh
-                delay(TimeUnit.MINUTES.toMillis(30)) // Check every 30 mins
-                refreshLocationAndWeather()
             }
         }
     }
@@ -301,16 +352,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         dGeneratedInSession = 0.0
         showTurnAroundReminder = false
         
+        var medAlarmSent = false
         sessionJob = viewModelScope.launch {
             while (isSolarSessionActive) {
                 delay(1000) // Changed to 1 second for real-time timer update
                 val elapsedSeconds = (System.currentTimeMillis() - sessionStartTime) / 1000
                 currentSessionMinutes = (elapsedSeconds / 60).toInt()
                 
-                val currentUvi = weatherData?.current?.uvIndex ?: 0.0
+                val uvi = currentUvi
                 // Calculate vitamin D generated so far based on elapsed time
                 dGeneratedInSession = SolarCalculator.estimateVitaminD(
-                    uvi = currentUvi,
+                    uvi = uvi,
                     minutes = elapsedSeconds / 60.0,
                     skinExposurePercentage = skinExposurePercentage,
                     skinType = skinType
@@ -322,10 +374,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     notificationHelper.sendAlarm("¡Date la vuelta!", "Han pasado 10 minutos, cambia de posición.")
                 }
                 
-                // Alarm if MED exceeded
-                val medTime = com.example.circalux.ui.components.getMedTime(skinType, currentUvi)
-                if (medTime > 0 && currentSessionMinutes >= medTime) {
+                // Alarm if MED exceeded (only once per session)
+                val medTime = com.example.circalux.ui.components.getMedTime(skinType, uvi)
+                if (medTime > 0 && currentSessionMinutes >= medTime && !medAlarmSent) {
                     notificationHelper.sendAlarm("¡Límite alcanzado!", "Has superado el tiempo recomendado (MED) para tu tipo de piel.")
+                    medAlarmSent = true
                 }
             }
         }
@@ -333,12 +386,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopSolarSession(save: Boolean = false, weatherCondition: String = "") {
         if (save) {
-            val currentUvi = weatherData?.daily?.uvIndexMax?.firstOrNull() ?: 0.0
+            val uvi = currentUvi
             val session = SolarSession(
                 timestamp = sessionStartTime,
                 durationMinutes = currentSessionMinutes,
                 vitaminDGenerated = dGeneratedInSession,
-                uviAvg = currentUvi,
+                uviAvg = uvi,
                 locationName = "Lat: ${String.format("%.2f", latitude)} Lng: ${String.format("%.2f", longitude)}",
                 skinExposurePercentage = skinExposurePercentage,
                 skinType = skinType,
@@ -428,10 +481,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    fun addHealthMetric(glucose: Double, ketones: Double) {
-        val gki = glucose / 18.0 / ketones
+    fun addHealthMetric(glucose: Double, ketones: Double, timestamp: Long = System.currentTimeMillis()) {
+        val gki = if (ketones > 0) glucose / 18.0 / ketones else 0.0
         val metric = HealthMetric(
-            timestamp = System.currentTimeMillis(),
+            timestamp = timestamp,
             glucose = glucose,
             ketones = ketones,
             gki = gki
@@ -439,6 +492,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             sessionDao.insertHealthMetric(metric)
         }
+    }
+
+    fun addBodyMeasurement(
+        neck: Double,
+        waist: Double,
+        hip: Double,
+        chest: Double,
+        biceps: Double,
+        thigh: Double,
+        weight: Double,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        viewModelScope.launch {
+            val measurement = calculateBodyMeasurement(
+                timestamp = timestamp,
+                neck = neck,
+                waist = waist,
+                hip = hip,
+                chest = chest,
+                biceps = biceps,
+                thigh = thigh,
+                weight = weight
+            )
+            sessionDao.insertBodyMeasurement(measurement)
+        }
+    }
+
+    private fun calculateBodyMeasurement(
+        id: Long = 0,
+        timestamp: Long,
+        neck: Double,
+        waist: Double,
+        hip: Double,
+        chest: Double,
+        biceps: Double,
+        thigh: Double,
+        weight: Double
+    ): BodyMeasurement {
+        val userProfile = profile.value ?: UserProfile()
+        val height = if (userProfile.height > 0) userProfile.height else 170.0
+        val whtr = waist / height
+        
+        var bodyFat: Double
+        try {
+            if (userProfile.gender == "Mujer") {
+                bodyFat = 495 / (1.29579 - 0.35004 * log10(max(1.0, waist + hip - neck)) + 0.22100 * log10(height)) - 450
+            } else {
+                bodyFat = 495 / (1.0324 - 0.19077 * log10(max(1.0, waist - neck)) + 0.15456 * log10(height)) - 450
+            }
+        } catch (e: Exception) {
+            bodyFat = 0.0
+        }
+        if (bodyFat.isNaN() || bodyFat.isInfinite() || bodyFat < 0) bodyFat = 0.0
+
+        return BodyMeasurement(
+            id = id,
+            timestamp = timestamp,
+            neck = neck,
+            waist = waist,
+            hip = hip,
+            chest = chest,
+            biceps = biceps,
+            thigh = thigh,
+            weight = weight,
+            whtr = whtr,
+            bodyFatNavy = bodyFat
+        )
     }
 
     fun exportBackup(uri: Uri) {
@@ -481,28 +601,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val bodyMeasurements = sessionDao.getAllBodyMeasurements()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addBodyMeasurement(neck: Double, waist: Double, hip: Double, chest: Double, biceps: Double, thigh: Double, weight: Double) {
-        val heightValue = profile.value?.height ?: 170.0
-        val genderValue = profile.value?.gender ?: "Hombre"
-        
-        val whtr = waist / heightValue
-        
-        val log10 = { x: Double -> kotlin.math.log10(x) }
-        val bodyFat = if (genderValue == "Hombre") {
-            // Formula Navy Hombre: 495 / (1.0324 - 0.19077 * log10(waist - neck) + 0.15456 * log10(height)) - 450
-            495.0 / (1.0324 - 0.19077 * log10(waist - neck) + 0.15456 * log10(heightValue)) - 450.0
-        } else {
-            // Formula Navy Mujer: 495 / (1.29579 - 0.35004 * log10(waist + hip - neck) + 0.22100 * log10(height)) - 450
-            495.0 / (1.29579 - 0.35004 * log10(waist + hip - neck) + 0.22100 * log10(heightValue)) - 450.0
-        }
-        
-        val measurement = com.example.circalux.data.model.BodyMeasurement(
-            timestamp = System.currentTimeMillis(),
-            neck = neck, waist = waist, hip = hip, chest = chest, biceps = biceps, thigh = thigh,
-            weight = weight, whtr = whtr, bodyFatNavy = bodyFat
-        )
+    fun updateSolarSession(session: SolarSession) {
         viewModelScope.launch {
-            sessionDao.insertBodyMeasurement(measurement)
+            sessionDao.insertSolarSession(session)
+        }
+    }
+
+    fun updateRedLightSession(session: RedLightSession) {
+        viewModelScope.launch {
+            sessionDao.insertRedLightSession(session)
+        }
+    }
+
+    fun updateSupplementEntry(entry: SupplementEntry) {
+        viewModelScope.launch {
+            sessionDao.insertSupplementEntry(entry)
+        }
+    }
+
+    fun updateHealthMetric(metric: HealthMetric) {
+        viewModelScope.launch {
+            sessionDao.insertHealthMetric(metric)
+        }
+    }
+
+    fun updateBodyMeasurement(measurement: BodyMeasurement) {
+        viewModelScope.launch {
+            val recalculated = calculateBodyMeasurement(
+                id = measurement.id,
+                timestamp = measurement.timestamp,
+                neck = measurement.neck,
+                waist = measurement.waist,
+                hip = measurement.hip,
+                chest = measurement.chest,
+                biceps = measurement.biceps,
+                thigh = measurement.thigh,
+                weight = measurement.weight
+            )
+            sessionDao.insertBodyMeasurement(recalculated)
         }
     }
 }
