@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
                                 val navItems = listOf(
                                     Triple("Home", "home", Icons.Default.Home),
                                     Triple("Historial y Gráficas", "history", Icons.Default.History),
-                                    Triple("Mi Perfil y Activación", "profile", Icons.Default.Person),
+                                    Triple("Mi Perfil", "profile", Icons.Default.Person),
                                     Triple("Blog Jota Manifesto", "manifesto", Icons.Default.Description),
                                     Triple("Estado de Sensores", "sensors", Icons.Default.CompassCalibration),
                                     Triple("Ajustes", "settings", Icons.Default.Settings)
@@ -161,6 +161,21 @@ class MainActivity : ComponentActivity() {
                                     colors = NavigationDrawerItemDefaults.colors(
                                         unselectedIconColor = Color(0xFFE57373),
                                         unselectedTextColor = Color(0xFFE57373)
+                                    )
+                                )
+
+                                NavigationDrawerItem(
+                                    label = { Text("Apoyar en Ko-fi", fontWeight = FontWeight.SemiBold) },
+                                    selected = false,
+                                    onClick = {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://ko-fi.com/cu0uz"))
+                                        context.startActivity(intent)
+                                    },
+                                    icon = { Icon(Icons.Default.Coffee, null) },
+                                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                                    colors = NavigationDrawerItemDefaults.colors(
+                                        unselectedIconColor = Color(0xFF29ABE2),
+                                        unselectedTextColor = Color(0xFF29ABE2)
                                     )
                                 )
 

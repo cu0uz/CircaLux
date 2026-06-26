@@ -1,6 +1,8 @@
 package com.example.circalux.ui.screens
 
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,8 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,7 +56,7 @@ fun ProfileScreen(viewModel: MainViewModel) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0) // Inherit from parent
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -84,13 +85,13 @@ fun ProfileScreen(viewModel: MainViewModel) {
             
             Row(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
-                value = age,
-                onValueChange = { age = it },
-                label = { Text("Edad") },
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.White.copy(alpha = 0.2f))
-            )
+                    value = age,
+                    onValueChange = { age = it },
+                    label = { Text("Edad") },
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.White.copy(alpha = 0.2f))
+                )
                 
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Género", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
@@ -165,30 +166,20 @@ fun ProfileScreen(viewModel: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = SolarYellow) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedBorderColor = SolarYellow,
                             disabledTextColor = Color.White,
                             disabledLabelColor = Color.White.copy(alpha = 0.6f),
-                            disabledPlaceholderColor = Color.White.copy(alpha = 0.6f),
                             disabledBorderColor = Color.White.copy(alpha = 0.2f),
                             disabledTrailingIconColor = SolarYellow
                         ),
                         enabled = false
                     )
-                    // Overlay for click detection since OutlinedTextField is disabled
                     Box(modifier = Modifier.matchParentSize().clickable {
                         val calendar = Calendar.getInstance().apply { timeInMillis = lastAnalyticDate }
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, dayOfMonth ->
-                                val newCalendar = Calendar.getInstance()
-                                newCalendar.set(year, month, dayOfMonth)
-                                lastAnalyticDate = newCalendar.timeInMillis
-                            },
-                            calendar.get(Calendar.YEAR),
-                            calendar.get(Calendar.MONTH),
-                            calendar.get(Calendar.DAY_OF_MONTH)
-                        ).show()
+                        DatePickerDialog(context, { _, y, m, d ->
+                            val newCal = Calendar.getInstance()
+                            newCal.set(y, m, d)
+                            lastAnalyticDate = newCal.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
                     })
                 }
             }
@@ -210,7 +201,7 @@ fun ProfileScreen(viewModel: MainViewModel) {
                     colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.White.copy(alpha = 0.2f))
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 Text("Frecuencia", style = MaterialTheme.typography.labelSmall)
                 val frequencies = listOf("Diario", "Semanal", "Mensual")
@@ -233,11 +224,8 @@ fun ProfileScreen(viewModel: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = SolarYellow) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedBorderColor = SolarYellow,
                             disabledTextColor = Color.White,
                             disabledLabelColor = Color.White.copy(alpha = 0.6f),
-                            disabledPlaceholderColor = Color.White.copy(alpha = 0.6f),
                             disabledBorderColor = Color.White.copy(alpha = 0.2f),
                             disabledTrailingIconColor = SolarYellow
                         ),
@@ -245,17 +233,11 @@ fun ProfileScreen(viewModel: MainViewModel) {
                     )
                     Box(modifier = Modifier.matchParentSize().clickable {
                         val calendar = Calendar.getInstance().apply { timeInMillis = supplementStartDate }
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, dayOfMonth ->
-                                val newCalendar = Calendar.getInstance()
-                                newCalendar.set(year, month, dayOfMonth)
-                                supplementStartDate = newCalendar.timeInMillis
-                            },
-                            calendar.get(Calendar.YEAR),
-                            calendar.get(Calendar.MONTH),
-                            calendar.get(Calendar.DAY_OF_MONTH)
-                        ).show()
+                        DatePickerDialog(context, { _, y, m, d ->
+                            val newCal = Calendar.getInstance()
+                            newCal.set(y, m, d)
+                            supplementStartDate = newCal.timeInMillis
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
                     })
                 }
             }
@@ -291,10 +273,7 @@ fun ProfileScreen(viewModel: MainViewModel) {
                     )
                     viewModel.saveProfile(newProfile)
                     scope.launch {
-                        snackbarHostState.showSnackbar(
-                            message = "¡Perfil guardado con éxito!",
-                            duration = SnackbarDuration.Short
-                        )
+                        snackbarHostState.showSnackbar("¡Perfil guardado con éxito!")
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -303,185 +282,41 @@ fun ProfileScreen(viewModel: MainViewModel) {
                 Text("GUARDAR PERFIL", fontWeight = FontWeight.Bold)
             }
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = if (viewModel.isActivated) Color(0xFF1B2614) else Color(0xFF261414)),
-                shape = RoundedCornerShape(16.dp)
+            // Ko-fi Button
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/cu0uz"))
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF29ABE2),
+                    contentColor = Color.White
+                )
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        if (viewModel.isActivated) "APP ACTIVADA" else "ESTADO: PRUEBA (TRIAL)",
-                        fontWeight = FontWeight.Bold,
-                        color = if (viewModel.isActivated) Color(0xFF81C784) else Color(0xFFE57373)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // User ID Section with Copy Button
-                    Surface(
-                        onClick = {
-                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("CircaLux ID", viewModel.userId)
-                            clipboard.setPrimaryClip(clip)
-                            scope.launch { snackbarHostState.showSnackbar("ID copiado al portapapeles") }
-                        },
-                        color = Color.White.copy(alpha = 0.05f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text("USER ID", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
-                                Text(viewModel.userId, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copiar ID",
-                                tint = SolarYellow,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    
-                    if (!viewModel.isActivated) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        var showKofiInstructions by remember { mutableStateOf(false) }
-                        
-                        Text(
-                            "ACTIVA LA VERSIÓN COMPLETA",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = SolarYellow
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Elimina el límite de sesiones y desbloquea todas las funciones por solo 1€.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                        
-                        Button(
-                            onClick = { showKofiInstructions = true },
-                            modifier = Modifier.padding(top = 12.dp).fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF29ABE0), contentColor = Color.White)
-                        ) {
-                            Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("COMPRAR ACTIVACIÓN (1€)")
-                        }
-
-                        if (showKofiInstructions) {
-                            AlertDialog(
-                                onDismissRequest = { showKofiInstructions = false },
-                                containerColor = Color(0xFF0F1724),
-                                title = { Text("🚀 Pasos para la Activación", fontWeight = FontWeight.Bold, color = SolarYellow) },
-                                text = {
-                                    Column {
-                                        Text("Para activar tu cuenta manualmente, sigue estos pasos:")
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        
-                                        Surface(
-                                            color = Color.White.copy(alpha = 0.05f),
-                                            shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Text("PASO 1:", style = MaterialTheme.typography.labelSmall, color = SolarYellow)
-                                                Text("Copia tu USER ID:", style = MaterialTheme.typography.bodySmall)
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Text(viewModel.userId, fontWeight = FontWeight.Bold, color = Color.White)
-                                                    IconButton(onClick = {
-                                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                                        val clip = android.content.ClipData.newPlainText("CircaLux ID", viewModel.userId)
-                                                        clipboard.setPrimaryClip(clip)
-                                                        scope.launch { snackbarHostState.showSnackbar("ID copiado") }
-                                                    }) {
-                                                        Icon(Icons.Default.ContentCopy, null, tint = SolarYellow, modifier = Modifier.size(20.dp))
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        
-                                        Text("PASO 2:", style = MaterialTheme.typography.labelSmall, color = SolarYellow)
-                                        Text("Pulsa en 'Ir a Ko-fi' y realiza una donación de 1€.", style = MaterialTheme.typography.bodySmall)
-                                        
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        
-                                        Text("⚠️ MUY IMPORTANTE:", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE57373))
-                                        Text(
-                                            "Introduce tu USER ID en el campo 'Mensaje' o 'Comentario' de Ko-fi. Sin esto no podremos enviarte tu código.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFE57373)
-                                        )
-                                        
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("Recibirás tu código de activación por email en un plazo de 24h.", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
-                                    }
-                                },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            showKofiInstructions = false
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://ko-fi.com/cu0uz"))
-                                            context.startActivity(intent)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = SolarYellow, contentColor = Color.Black)
-                                    ) {
-                                        Text("IR A KO-FI (1€)")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showKofiInstructions = false }) {
-                                        Text("CANCELAR", color = Color.White.copy(alpha = 0.6f))
-                                    }
-                                }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        var code by remember { mutableStateOf("") }
-                        OutlinedTextField(
-                            value = code,
-                            onValueChange = { code = it },
-                            label = { Text("Código de Activación") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Button(
-                            onClick = { 
-                                if (viewModel.activateApp(code)) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("¡Aplicación activada con éxito!")
-                                    }
-                                } else {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Código de activación inválido.")
-                                    }
-                                }
-                            },
-                            modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = SolarYellow, contentColor = Color.Black)
-                        ) {
-                            Text("ACTIVAR AHORA")
-                        }
-                    }
-                }
+                Icon(Icons.Default.Coffee, contentDescription = null)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("APOYAR PROYECTO (KO-FI)", fontWeight = FontWeight.Bold)
             }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Surface(
+                color = Color.White.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "USER ID: ${viewModel.userId}", 
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
