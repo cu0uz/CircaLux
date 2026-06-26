@@ -70,26 +70,27 @@ fun SolarSessionControls(
             Spacer(modifier = Modifier.height(20.dp))
             
             Text(
-                "SELECCIONA TU NIVEL DE EXPOSICIÓN",
+                "¿QUÉ PARTE DE TU CUERPO RECIBE EL SOL?",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f),
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // CLEARER EXPOSURE SELECTOR
+            // CLEARER EXPOSURE SELECTOR - Focused on what is EXPOSED
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 val percentages = listOf(
-                    0.1 to "Solo cara",
-                    0.3 to "Camiseta",
-                    0.5 to "Pantalón",
-                    0.7 to "Bañador",
-                    1.0 to "Desnudo"
+                    0.1 to "Solo Cara/Manos",
+                    0.3 to "Brazos Desc.",
+                    0.5 to "Torso Desc.",
+                    0.7 to "En Bañador",
+                    1.0 to "Piel Total"
                 )
                 percentages.forEach { (pct, label) ->
                     ExposureCard(
@@ -115,7 +116,7 @@ fun SolarSessionControls(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 Icon(if (isActive) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     if (isActive) "FINALIZAR SESIÓN" else "INICIAR EXPOSICIÓN",
                     fontWeight = FontWeight.Black,
@@ -243,7 +244,7 @@ fun RedLightSessionCard(
                 )
             ) {
                 Icon(if (isActive) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     if (isActive) "PARAR LUZ ROJA" else "INICIAR LUZ ROJA",
                     fontWeight = FontWeight.Black
